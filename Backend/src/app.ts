@@ -27,17 +27,27 @@ app.listen(PORT, () => {
 });
 
 app.post("/projects", (req, res) => {
+  const { project } = req.body;
+
+  if (!project || !project.name || !project.description) {
+    res
+      .status(400)
+      .json({ error: "Project data with name and description is required" });
+    return;
+  }
+
   const uuidString = uuid();
 
   let hash = 0;
   for (let i = 0; i < uuidString.length; i++) {
     hash = hash * 31 + uuidString.charCodeAt(i);
-    hash = hash >>> 0; // Ensure positive integer
+    hash = hash >>> 0;
   }
+
   const newProject: IProject = {
     id: hash,
-    name: req.body.name,
-    description: req.body.description,
+    name: project.name,
+    description: project.description,
   };
 
   projects.push(newProject);
