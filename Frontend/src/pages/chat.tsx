@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Send } from "lucide-react";
+import { Send, Smile } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Chat() {
   const [messages, setMessages] = useState<string[]>([]);
   const [input, setInput] = useState("");
   const [isConnected, setIsConnected] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const ws = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to bottom when new messages are added, only if near bottom
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (container) {
@@ -22,7 +23,6 @@ export default function Chat() {
     }
   }, [messages]);
 
-  // WebSocket connection handling
   useEffect(() => {
     ws.current = new WebSocket("ws://localhost:3000");
 
@@ -64,69 +64,121 @@ export default function Chat() {
     ) {
       ws.current.send(input);
       setInput("");
+      setShowEmojiPicker(false);
     }
   };
 
-  return (
-    <div className="flex-1 flex flex-col overflow-auto bg-gray-50 min-h-screen">
-      {/* Centered Content Container */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4">
-        <div className="max-w-xl w-full">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-semibold text-gray-800">Live Chat</h1>
-            <p className="text-sm text-gray-500">
-              {isConnected ? `${messages.length} messages` : "Connecting..."}
-            </p>
-          </div>
+  const addEmoji = (emoji: string) => {
+    setInput((prev) => prev + emoji);
+  };
 
-          {/* Messages Container */}
-          <div
-            ref={messagesContainerRef}
-            className="bg-gray-100 rounded-md p-4 h-96 overflow-y-auto mb-4 shadow-sm"
-            role="log"
-            aria-live="polite"
-          >
-            {messages.length === 0 && (
-              <div className="text-center text-gray-500 text-sm">
-                No messages yet. Start chatting!
-              </div>
-            )}
-            {messages.map((msg, idx) => (
+  return (
+    <div className="flex flex-col w-screen h-screen bg-gray-100">
+      <div className="flex items-center justify-between bg-purple-600 text-white p-4 shadow-md">
+        <h1 className="text-xl font-semibold">Live Chat</h1>
+        <span className="text-sm flex items-center gap-2">
+          <span
+            className={`w-2 h-2 rounded-full ${
+              isConnected ? "bg-green-400" : "bg-red-400"
+            }`}
+          />
+          {isConnected ? "Online" : "Offline"}
+        </span>
+      </div>
+
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 bg-white p-6 overflow-y-auto"
+        role="log"
+        aria-live="polite"
+      >
+        {messages.length === 0 && (
+          <div className="text-center text-gray-500 text-sm mt-20">
+            No messages yet. Start the conversation!
+          </div>
+        )}
+        <AnimatePresence>
+          {messages.map((msg, idx) => (
+            <motion.div
+              key={idx}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className={`flex mb-4 ${
+                idx % 2 === 0 ? "justify-end" : "justify-start"
+              }`}
+              aria-label={`Message ${idx + 1}: ${msg}`}
+            >
               <div
-                key={idx}
-                className={`mb-2 p-2 rounded-md text-gray-700 transition-opacity duration-300 ${
-                  idx % 2 === 0 ? "bg-white" : "bg-gray-200"
+                className={`flex items-end max-w-[70%] ${
+                  idx % 2 === 0 ? "flex-row-reverse" : ""
                 }`}
               >
-                {msg}
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold ${
+                    idx % 2 === 0 ? "bg-purple-500" : "bg-gray-500"
+                  }`}
+                >
+                  {idx % 2 === 0 ? "U" : "O"}
+                </div>
+                <div
+                  className={`p-3 rounded-lg shadow-sm mx-3 ${
+                    idx % 2 === 0
+                      ? "bg-purple-100 text-gray-800"
+                      : "bg-gray-200 text-gray-700"
+                  }`}
+                >
+                  {msg}
+                </div>
               </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+        <div ref={messagesEndRef} />
+      </div>
 
-          {/* Input Container */}
-          <div className="flex w-full">
-            <input
-              className="flex-1 p-3 rounded-l-md bg-gray-100 text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") sendMessage();
-              }}
-              placeholder="Type your message..."
-              disabled={!isConnected}
-              aria-label="Chat message input"
-            />
-            <button
-              className="bg-purple-500 text-white px-4 py-3 rounded-r-md hover:bg-purple-600 transition-colors flex items-center disabled:bg-gray-400"
-              onClick={sendMessage}
-              disabled={!isConnected}
-              aria-label="Send message"
-            >
-              <Send className="h-5 w-5" />
-            </button>
+      <div className="bg-white p-4 shadow-md flex items-center space-x-3 relative">
+        <button
+          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+          className="p-2 text-gray-600 hover:text-purple-600 transition-colors"
+          aria-label="Toggle emoji picker"
+        >
+          <Smile className="h-6 w-6" />
+        </button>
+        {showEmojiPicker && (
+          <div className="absolute bottom-16 left-4 bg-white rounded-lg shadow-lg p-3 grid grid-cols-6 gap-2 z-10">
+            {["😊", "😂", "❤️", "👍", "😎", "🚀"].map((emoji) => (
+              <button
+                key={emoji}
+                onClick={() => addEmoji(emoji)}
+                className="text-lg hover:bg-gray-100 rounded p-1"
+                aria-label={`Add ${emoji} emoji`}
+              >
+                {emoji}
+              </button>
+            ))}
           </div>
-        </div>
+        )}
+        <input
+          className="flex-1 p-3 bg-gray-100 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500 placeholder-gray-400"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") sendMessage();
+          }}
+          placeholder="Type your message..."
+          disabled={!isConnected}
+          aria-label="Chat message input"
+        />
+        <button
+          className="p-3 bg-purple-500 text-white rounded-full hover:bg-purple-600 transition-colors disabled:bg-gray-400"
+          onClick={sendMessage}
+          disabled={!isConnected}
+          aria-label="Send message"
+        >
+          <Send className="h-5 w-5" />
+        </button>
       </div>
     </div>
   );
