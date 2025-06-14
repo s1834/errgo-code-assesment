@@ -1,14 +1,19 @@
 import express from "express";
 import cors from "cors";
-import { IProject } from "./models/project.interface";
+import { IProject, projectSchema } from "./models/project.interface";
 import { v4 as uuid } from "uuid";
+import { createServer } from "http";
+import { WebSocketServer } from "ws";
+import { z } from "zod";
 
 const app = express();
-const PORT = 3000;
-// List of projects
-const projects: IProject[] = [];
+const server = createServer(app);
+const wss = new WebSocketServer({ server });
 
-// Setup cors and express.json()
+const PORT = 3000;
+const projects: IProject[] = [];
+let chatMessages: string[] = [];
+
 app.use(
   cors({
     origin: "*",
@@ -22,22 +27,16 @@ app.get("/", (_req, res) => {
   res.send("Errgo Backend Interview Module Loaded Successfully!");
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
-
 app.post("/projects", (req, res) => {
   const { project } = req.body;
 
-  if (!project || !project.name || !project.description) {
-    res
-      .status(400)
-      .json({ error: "Project data with name and description is required" });
+  const validation = projectSchema.safeParse(project);
+  if (!validation.success) {
+    res.status(400).json({ error: validation.error.format() });
     return;
   }
 
   const uuidString = uuid();
-
   let hash = 0;
   for (let i = 0; i < uuidString.length; i++) {
     hash = hash * 31 + uuidString.charCodeAt(i);
@@ -46,8 +45,8 @@ app.post("/projects", (req, res) => {
 
   const newProject: IProject = {
     id: hash,
-    name: project.name,
-    description: project.description,
+    name: validation.data.name,
+    description: validation.data.description,
   };
 
   projects.push(newProject);
@@ -56,4 +55,23 @@ app.post("/projects", (req, res) => {
 
 app.get("/projects", (req, res) => {
   res.status(200).json(projects);
+});
+
+wss.on("connection", (ws) => {
+  ws.send(JSON.stringify({ type: "history", messages: chatMessages }));
+
+  ws.on("message", (message) => {
+    const msgStr = message.toString();
+    chatMessages.push(msgStr);
+
+    wss.clients.forEach((client) => {
+      if (client.readyState === client.OPEN) {
+        client.send(JSON.stringify({ type: "new_message", message: msgStr }));
+      }
+    });
+  });
+});
+
+server.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
 });
